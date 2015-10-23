@@ -14,6 +14,8 @@ Once a source git repo is added to "Sources", a build to create a package is aut
 2. After a build is successful, you can find the built packages stored on your apt repo "http://apt.overcastcloud.com/username/username". Click on "Repositories" link on the left to see your apt repo.
 3. You'll find your built package on http://apt.overcastcloud.com/username/username/ under pool/.
 
+In case you don't have a debian folder in your git source repo, package builder will place a basic debian folder into the repo. The package will be created using defaults. This may be good for basic libraries, but may create problems for custom services and openstack components which require specific packaging rules. Please review openstack debian folders on Launchpad.net and include those for packaging openstack components.
+
 ## Deleting a package source repository
 
 1. To delete a package source, go to "Sources" link on the left.
