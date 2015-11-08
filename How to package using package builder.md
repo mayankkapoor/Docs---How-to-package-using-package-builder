@@ -237,6 +237,8 @@ The reponse to a successful post is as below
     ]
 }
 
+```
+
 You can get the URL of the mirror_set created with its UUID. From this we proceed to create snapshots
 
 ##Creating Snapshots
