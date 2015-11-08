@@ -100,4 +100,187 @@ Example output:
 
 ## How to create mirror-sets and snapshots
 
-TBD
+The Mirror-set/snapshots feature comprises of 3 steps
+1. Create a mirror of an external/internal repo
+2. Combine multiple mirrors and create a mirror-set
+3. From the mirror-set create snapshots
+
+To give an example of how it works (from a software developer perspective)
+Lets say you are a nova-api developer, you are intrested in developing a feature/fixing a bug. The above mentioned steps will help you to package the code and place it into a repository. So the next step is how can you deploy this feature/bug-fix with sufficient testing into production. So you follow the below steps
+
+1. First create a mirror from the repository you wish to deploy
+2. From that mirror, create a mirror-set , here you can add other mirrors which you want (maybe dependecies of your code, upstream ubuntu repo)
+3. From this mirror set you will create a snapshot , which give you the URL of the snapshot of your mirrorset.
+4. Use this URL in your sources.list to get your feature/bug fix into the environment for testing
+5. Lets say your fix works, all you need to do is change the URL in the next environment to point it to your snapshot
+6. And thereby get your patch into production.
+
+The primariy benefit of this feature is, if lets say you push a bad code and it gets placed into the repository, it will not impact other environments during next upgrade, because the sources.list will always point to a snapshot of a repo and never the actual repo (For eg : Contrail repo is :-http://jiocloud.rustedhalo.com/contrailv2/, whereas the snapshot of it is :- https://aasemble.com/snapshots/21/jiocloud.rustedhalo.com/contrailv2/). So you can see even if bad code gets into the main repo, none of the environment gets impacted because it always refer to the snapshot. It also helps in terms of rollbacks as you always know the last snapshot which worked well.
+
+Currently all the below steps is possible only from API and not from UI
+##Creating a Mirror
+
+For creating a mirror , do an HTTP POST with the below JSON ( the header should contain the Authorization Token as described in above steps)
+
+```
+URL :- https://aassemble.com/api/v2/mirrors/
+
+```
+An example JSON data for creating the mirrors is given below
+
+```
+{
+  "url": "http://jiocloud.rustedhalo.com/contrailv2",
+  "series": ["trusty"],
+  "components": ["main"],
+  "public": true
+}
+```
+The JSON data is pretty self explantory, but a quick look into it
+
+1. URL :- The url of the APT-repository which you want to mirror
+2. series :- 
+3. Components:- what components in that repo do you want to mirror (main, restricted etc)
+4. Public :- If the mirror needs to be visible to all 
+
+You will get a response from the server as below (if all the fields are true)
+
+```
+
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "self": "https://aasemble.com/api/v2/mirrors/1895442f-5615-43bf-9afe-dfdbdedeaa46/",
+            "url": "http://jiocloud.rustedhalo.com/contrailv2",
+            "series": [
+                "trusty"
+            ],
+            "components": [
+                "main"
+            ],
+            "public": true,
+            "refresh_in_progress": false
+        }
+    ]
+}
+
+```
+From the response we can see the UUID of the mirror we created, this we will refer in later steps. 
+
+##Refreshing a Mirror
+From the output of the above , there is one field namely 'refresh_in_progress'. This is updated whenver a refresh of a mirror is called. The above POST, will create a mirror but it still does not hold any data. For the backend to start the mirroring process, a refresh to that mirror needs to be called
+
+```
+HTTP POST URL :- 'https://aasemble.com/api/v2/mirrors/1895442f-5615-43bf-9afe-dfdbdedeaa46/refresh/'
+
+```
+The UUID should be replaced by the mirror UUID got in the first POST
+Now if we do a HTTP GET to the below URL
+
+```
+URL :- https://aasemble.com/api/v2/mirrors/1895442f-5615-43bf-9afe-dfdbdedeaa46/
+
+```
+We get the below response
+
+```
+{
+        {
+            "self": "https://aasemble.com/api/v2/mirrors/1895442f-5615-43bf-9afe-dfdbdedeaa46/",
+            "url": "http://jiocloud.rustedhalo.com/contrailv2",
+            "series": [
+                "trusty"
+            ],
+            "components": [
+                "main"
+            ],
+            "public": true,
+            "refresh_in_progress": true
+        }
+}
+
+```
+
+We can see that the 'refresh_in_progress' field is now true, depending upon the size of the APT-repo, this will take anywhere from few minutes to couple of hours for large repos (eg:- Ubuntu Apt Repo)
+
+Keep doing the the GET call till you see the refresh_in_progress is back to 'false'
+
+## Creating Mirror Sets
+Now that we have created mirrors of different repos we can combine the mirrors into mirror sets.
+
+To create mirror sets do an HTTP POST to the below URL
+
+```
+URL:- https://aasemble.com/api/v2/mirror_sets/ 
+
+```
+with the below JSON
+
+```
+{
+  "mirrors": ["https://aasemble.com/api/v2/mirrors/1895442f-5615-43bf-9afe-dfdbdedeaa46/", "https://aasemble.com/api/v2/mirrors/9815442f-5615-43bf-9afe-dfdbdedeeb4f/"]
+}
+
+```
+So the above JSON data contains all the mirrors you need to create a mirror set from.
+
+The reponse to a successful post is as below
+
+```
+{
+    "self": "https://aasemble.com/api/v2/mirror_sets/4367dff4-c740-4c73-817c-8bf4eaf81ab2/",
+    "mirrors": [
+        "https://aasemble.com/api/v2/mirrors/1895442f-5615-43bf-9afe-dfdbdedeaa46/",""https://aasemble.com/api/v2/mirrors/9815442f-5615-43bf-9afe-dfdbdedeeb4f/"
+    ]
+}
+
+You can get the URL of the mirror_set created with its UUID. From this we proceed to create snapshots
+
+##Creating Snapshots
+To create snapshots we do a HTTP POST to the below URL
+
+```
+URL:- https://aasemble.com/api/v2/snapshots/
+
+```
+with the following JSON data, which contains the mirrorset URL which we got from above
+
+```
+{
+  "mirrorset": "https://aasemble.com/api/v2/mirror_sets/4367dff4-c740-4c73-817c-8bf4eaf81ab/"
+}
+
+```
+Following a successful Post we get the following
+
+```
+{
+    "self": "https://aasemble.com/api/v2/snapshots/44ffde23-c740-4c73-817c-8bf4eafab81/",
+    "timestamp": "2015-11-05T06:49:56.430630Z",
+    "mirrorset": "http://localhost:8000/api/v1/mirror_sets/4367dff4-c740-4c73-817c-8bf4eaf81ab/"
+}
+
+```
+
+Now this snapshot can be added into the sources.list in your environment.
+
+Lets say you created a snapshot from a mirror set which had 2 mirrors (namely: jiocloud.rustedhalo.com and archive.ubuntu.com). Then the URL for jiocloud.runstedhalo.com in your sources.list will be
+
+```
+URL:- https://aasemble.com/snapshots/44ffde23-c740-4c73-817c-8bf4eafab81/jiocloud.rustedhalo.com/
+
+```
+
+and similarly for your archive.ubuntu.com will be
+
+```
+URL:- https://aasemble.com/snapshots/44ffde23-c740-4c73-817c-8bf4eafab81/archive.ubuntu.com/
+
+```
+
+So if there is a new snapshot is created then all we need to change is the UUID in URL with the latest snapshot UUID
+
+
